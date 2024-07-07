@@ -17,42 +17,10 @@
         android:text="Número" />
 
     <TextView
-        android:id="@+id/totalTextView"
+        android:id="@+id/frequencyTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:fontFamily="@font/poppins_semibold"
         android:textColor="@color/textColor_two"
-        android:text="Frequência total" />
-
-    <TextView
-        android:id="@+id/yearTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/poppins_semibold"
-        android:textColor="@color/textColor_two"
-        android:text="Frequência do ano" />
-
-    <TextView
-        android:id="@+id/monthTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/poppins_semibold"
-        android:textColor="@color/textColor_two"
-        android:text="Frequência do mês" />
-
-    <TextView
-        android:id="@+id/weekTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/poppins_semibold"
-        android:textColor="@color/textColor_two"
-        android:text="Frequência da semana" />
-
-    <TextView
-        android:id="@+id/dayTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="@font/poppins_semibold"
-        android:textColor="@color/textColor_two"
-        android:text="Frequência do dia" />
+        android:text="Frequência" />
 </LinearLayout>

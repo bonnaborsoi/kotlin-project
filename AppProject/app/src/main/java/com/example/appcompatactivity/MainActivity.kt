@@ -1,7 +1,6 @@
 package com.example.appcompatactivity
 
-
-import android.os.Bundle
+// Importações necessárias para componentes do Android e Compose
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,62 +12,106 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.appcompatactivity.ui.theme.AppCompatActivityTheme
+import java.util.Calendar
 
+// Importações para permissões, acesso a dados e componentes do Android
 import android.Manifest
+import android.content.ContentResolver
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.os.Build
+import android.os.Bundle
+import android.provider.CallLog
+import android.provider.ContactsContract
+import android.util.Log
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import android.database.Cursor
-import android.provider.CallLog
-import android.util.Log
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import java.util.Calendar
+import java.util.*
 
+// Classe principal da atividade principal (MainActivity)
 class MainActivity : AppCompatActivity() {
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var numberAdapter: NumberAdapter
-    private val PERMISSIONS_REQUEST_CODE = 123 // identificar solicitação de permissão
 
+    // Declaração de variáveis de classe
+    private lateinit var recyclerView: RecyclerView  // RecyclerView para exibir os registros
+    private lateinit var numberAdapter: NumberAdapter  // Adaptador para a RecyclerView
+    private val PERMISSIONS_REQUEST_CODE = 123 // Código para identificar a solicitação de permissão
+    private lateinit var spinner: Spinner  // Spinner para selecionar o período de visualização
+    private val periods = listOf("total", "year", "month", "week", "day")  // Lista de períodos de visualização
+    private val callLogs = mutableMapOf<String, MutableMap<String, Int>>() // Mapa para armazenar os registros de chamadas
+    private val contactNames = mutableMapOf<String, String>()  // Mapa para armazenar nomes de contatos associados aos números
+
+    // Método chamado quando a atividade é criada
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_main)  // Define o layout da atividade como activity_main.xml
 
-        recyclerView = findViewById(R.id.recyclerView)
-        recyclerView.layoutManager = LinearLayoutManager(this)
+        spinner = findViewById(R.id.spinner)  // Referencia o Spinner do layout
+        recyclerView = findViewById(R.id.recyclerView)  // Referencia a RecyclerView do layout
+        recyclerView.layoutManager = LinearLayoutManager(this)  // Configura o layout da RecyclerView como linear
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) { // verifica se as permissões READ_CALL_LOG e READ_PHONE_STATE foram concedidas
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CALL_LOG, Manifest.permission.READ_PHONE_STATE), PERMISSIONS_REQUEST_CODE) // se alguma delas não foi concedida, ActivityCompat.requestPermissions é chamada p solicitar as permissões
-            } else {
-                fetchCallLogs() // se as permissões já foram concedidas, fetchCallLogs() é chamada para acessar os registros de chamadas
+        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, periods)  // Cria um adaptador para o Spinner com os períodos
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)  // Configura o layout do dropdown do Spinner
+        spinner.adapter = spinnerAdapter  // Define o adaptador no Spinner
+
+        // Configura o listener de seleção de item do Spinner
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                updateRecyclerView(periods[position])  // Atualiza a RecyclerView com base no período selecionado
             }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+
+        // Lista de permissões a serem solicitadas
+        val permissionsToRequest = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.READ_CALL_LOG)  // Adiciona permissão de leitura de registros de chamadas
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.READ_PHONE_STATE)  // Adiciona permissão de leitura do estado do telefone
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.READ_CONTACTS)  // Adiciona permissão de leitura de contatos
+        }
+
+        // Se houver permissões a serem solicitadas, solicita-as
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), PERMISSIONS_REQUEST_CODE)
         } else {
-            fetchCallLogs()
+            fetchCallLogs()  // Caso contrário, inicia o processo de obtenção dos registros de chamadas
         }
     }
+
+    // Método chamado quando a resposta à solicitação de permissões é recebida
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        // PackageManager.PERMISSION_GRANTED indica que a permissão foi concedida!
-        if (requestCode == PERMISSIONS_REQUEST_CODE) { // se o requestCode corresponde a PERMISSIONS_REQUEST_CODE
-            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) && // temos que checar se as duas permissões foram concedidas (READ_CALL_LOG e READ_PHONE_STATE)
-                (grantResults.size > 1 && grantResults[1] == PackageManager.PERMISSION_GRANTED)) { // grantResults armazena os resultados das duas solicitações (grandResults[0] o da primeira e gradResults[1] o da segunda)
-                fetchCallLogs()
+        if (requestCode == PERMISSIONS_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                fetchCallLogs()  // Se todas as permissões foram concedidas, inicia a obtenção dos registros de chamadas
             } else {
-                Toast.makeText(this, "Permissões necessárias não concedidas", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Permissões necessárias não concedidas", Toast.LENGTH_SHORT).show()  // Caso contrário, exibe uma mensagem de erro
             }
         }
     }
 
+    // Método para obter os registros de chamadas
     private fun fetchCallLogs() {
-        val callLogs = mutableMapOf<String, MutableMap<String, Int>>() // Map para armazenar frequências de chamadas por número e por período
+        Log.d("MainActivity", "Fetching contact names")  // Log indicando o início da obtenção de nomes de contatos
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            fetchContactNames()  // Se a permissão de leitura de contatos estiver concedida, obtém os nomes dos contatos
+        }
 
+        // Consulta os registros de chamadas através de um cursor
         val cursor: Cursor? = contentResolver.query(
-            CallLog.Calls.CONTENT_URI,
+            CallLog.Calls.CONTENT_URI,  // URI para acessar os registros de chamadas
             null,
             null,
             null,
@@ -76,30 +119,30 @@ class MainActivity : AppCompatActivity() {
         )
 
         cursor?.use {
-            val numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER)
-            val dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE)
+            val numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER)  // Índice da coluna de números de telefone
+            val dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE)  // Índice da coluna de datas das chamadas
 
-            val currentTime = System.currentTimeMillis()
-            val calendar = Calendar.getInstance()
+            val currentTime = System.currentTimeMillis()  // Tempo atual em milissegundos
+            val calendar = Calendar.getInstance()  // Instância do calendário
 
+            // Itera sobre cada registro de chamada no cursor
             while (cursor.moveToNext()) {
-                val number = cursor.getString(numberIndex)
-                val date = cursor.getLong(dateIndex)
+                val number = cursor.getString(numberIndex)  // Número de telefone da chamada
+                val date = cursor.getLong(dateIndex)  // Data da chamada em milissegundos
 
                 calendar.timeInMillis = date
-                val callYear = calendar.get(Calendar.YEAR)
-                val callMonth = calendar.get(Calendar.MONTH)
-                val callWeek = calendar.get(Calendar.WEEK_OF_YEAR)
-                val callDay = calendar.get(Calendar.DAY_OF_YEAR)
+                val callYear = calendar.get(Calendar.YEAR)  // Ano da chamada
+                val callMonth = calendar.get(Calendar.MONTH)  // Mês da chamada
+                val callWeek = calendar.get(Calendar.WEEK_OF_YEAR)  // Semana do ano da chamada
+                val callDay = calendar.get(Calendar.DAY_OF_YEAR)  // Dia do ano da chamada
 
                 calendar.timeInMillis = currentTime
-                val currentYear = calendar.get(Calendar.YEAR)
-                val currentMonth = calendar.get(Calendar.MONTH)
-                val currentWeek = calendar.get(Calendar.WEEK_OF_YEAR)
-                val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
+                val currentYear = calendar.get(Calendar.YEAR)  // Ano atual
+                val currentMonth = calendar.get(Calendar.MONTH)  // Mês atual
+                val currentWeek = calendar.get(Calendar.WEEK_OF_YEAR)  // Semana atual
+                val currentDay = calendar.get(Calendar.DAY_OF_YEAR)  // Dia atual
 
-                val periods = listOf("total", "year", "month", "week", "day")
-
+                // Se o número não estiver presente nos logs de chamada, adiciona-o com valores padrão
                 if (number !in callLogs) {
                     callLogs[number] = mutableMapOf(
                         "total" to 0,
@@ -110,8 +153,10 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
 
+                // Incrementa o contador de chamadas totais
                 callLogs[number]!!["total"] = callLogs[number]!!.getOrDefault("total", 0) + 1
 
+                // Incrementa os contadores de chamadas de acordo com o período atual
                 if (callYear == currentYear) {
                     callLogs[number]!!["year"] = callLogs[number]!!.getOrDefault("year", 0) + 1
                     if (callMonth == currentMonth) {
@@ -127,12 +172,60 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        numberAdapter = NumberAdapter(callLogs)
-        recyclerView.adapter = numberAdapter
+        updateRecyclerView("total")  // Atualiza a RecyclerView inicialmente com o período "total"
     }
 
+    // Método para obter nomes de contatos associados aos números de telefone
+    private fun fetchContactNames() {
+        val resolver: ContentResolver = contentResolver
+        val cursor: Cursor? = resolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )
+
+        cursor?.use {
+            val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            val nameIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+
+            // Itera sobre cada entrada de contato no cursor
+            while (cursor.moveToNext()) {
+                val number = cursor.getString(numberIndex)  // Número de telefone do contato
+                val name = cursor.getString(nameIndex)  // Nome do contato
+
+                contactNames[number] = name  // Associa o número ao nome do contato no mapa
+            }
+        }
+        Log.d("MainActivity", "Contact names fetched: ${contactNames.size}")  // Log indica que os nomes de contatos foram obtidos
+    }
+
+    // Método para atualizar a RecyclerView com base no período selecionado
+    private fun updateRecyclerView(period: String) {
+        Log.d("MainActivity", "Updating RecyclerView for period: $period")  // Log indica que a RecyclerView está sendo atualizada para o período específico
+
+        // Filtra os registros de chamadas para o período especificado e remove aqueles com contagem zero
+        val filteredLogs = callLogs.mapValues { it.value[period] ?: 0 }.filter { it.value > 0 }
+
+        // Ordena os registros filtrados por contagem de chamadas em ordem decrescente
+        val sortedLogs = filteredLogs.toList().sortedByDescending { it.second }.toMap()
+
+        // Cria um mapa com chaves como nomes de contatos ou números de telefone, e valores como contagens de chamadas
+        val displayLogs = sortedLogs.mapKeys { contactNames[it.key] ?: it.key }
+
+        // Logs para depuração
+        Log.d("MainActivity", "Filtered logs: $filteredLogs")
+        Log.d("MainActivity", "Sorted logs: $sortedLogs")
+        Log.d("MainActivity", "Display logs: $displayLogs")
+
+        // Cria um novo adaptador com os registros de chamadas para exibir na RecyclerView
+        numberAdapter = NumberAdapter(displayLogs)
+        recyclerView.adapter = numberAdapter  // Define o adaptador na RecyclerView para exibir os dados
+    }
 }
 
+// Composable function para exibir um cumprimento (usado para teste com Jetpack Compose)
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
@@ -141,6 +234,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
     )
 }
 
+// Preview do Composable Greeting (usado para teste com Jetpack Compose)
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
