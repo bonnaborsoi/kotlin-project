@@ -26,6 +26,7 @@ import android.provider.CallLog
 import android.util.Log
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
@@ -64,30 +65,72 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun fetchCallLogs() {
-        val callLogs = mutableMapOf<String, Int>() // map que armazena números de telefone e a frequência de chamadas
+        val callLogs = mutableMapOf<String, MutableMap<String, Int>>() // Map para armazenar frequências de chamadas por número e por período
 
-        val cursor: Cursor? = contentResolver.query( // usado para consultar os registros de chamadas no dispositivo
-            CallLog.Calls.CONTENT_URI, // CallLog.Calls.CONTENT_URI é a URI que especifica a tabela de registros de chamadas
+        val cursor: Cursor? = contentResolver.query(
+            CallLog.Calls.CONTENT_URI,
             null,
             null,
             null,
-            CallLog.Calls.DEFAULT_SORT_ORDER // ordem dos resultados: por data/hora de chamada
+            CallLog.Calls.DEFAULT_SORT_ORDER
         )
 
         cursor?.use {
             val numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER)
-            while (cursor.moveToNext()) { //itera sobre cada registro de chamada no cursor, armazenando a frequência no map
+            val dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE)
+
+            val currentTime = System.currentTimeMillis()
+            val calendar = Calendar.getInstance()
+
+            while (cursor.moveToNext()) {
                 val number = cursor.getString(numberIndex)
-                callLogs[number] = callLogs.getOrDefault(number, 0) + 1
+                val date = cursor.getLong(dateIndex)
+
+                calendar.timeInMillis = date
+                val callYear = calendar.get(Calendar.YEAR)
+                val callMonth = calendar.get(Calendar.MONTH)
+                val callWeek = calendar.get(Calendar.WEEK_OF_YEAR)
+                val callDay = calendar.get(Calendar.DAY_OF_YEAR)
+
+                calendar.timeInMillis = currentTime
+                val currentYear = calendar.get(Calendar.YEAR)
+                val currentMonth = calendar.get(Calendar.MONTH)
+                val currentWeek = calendar.get(Calendar.WEEK_OF_YEAR)
+                val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
+
+                val periods = listOf("total", "year", "month", "week", "day")
+
+                if (number !in callLogs) {
+                    callLogs[number] = mutableMapOf(
+                        "total" to 0,
+                        "year" to 0,
+                        "month" to 0,
+                        "week" to 0,
+                        "day" to 0
+                    )
+                }
+
+                callLogs[number]!!["total"] = callLogs[number]!!.getOrDefault("total", 0) + 1
+
+                if (callYear == currentYear) {
+                    callLogs[number]!!["year"] = callLogs[number]!!.getOrDefault("year", 0) + 1
+                    if (callMonth == currentMonth) {
+                        callLogs[number]!!["month"] = callLogs[number]!!.getOrDefault("month", 0) + 1
+                    }
+                    if (callWeek == currentWeek) {
+                        callLogs[number]!!["week"] = callLogs[number]!!.getOrDefault("week", 0) + 1
+                    }
+                    if (callDay == currentDay) {
+                        callLogs[number]!!["day"] = callLogs[number]!!.getOrDefault("day", 0) + 1
+                    }
+                }
             }
         }
 
-       // callLogs.forEach { (number, frequency) ->
-          //  Log.d("CallLogs", "Número: $number, Frequência: $frequency")
-       // }
-        numberAdapter = NumberAdapter(callLogs) // cria um NumberAdapter com os dados para exibir na RecyclerView
-        recyclerView.adapter = numberAdapter // define o adaptador criado para a RecyclerView, para que os dados sejam exibidos conforme configurado no adaptador
+        numberAdapter = NumberAdapter(callLogs)
+        recyclerView.adapter = numberAdapter
     }
+
 }
 
 @Composable
