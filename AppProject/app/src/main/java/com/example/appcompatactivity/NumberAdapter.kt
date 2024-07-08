@@ -23,7 +23,7 @@ class NumberAdapter(private val callLogs: Map<String, Int>) : RecyclerView.Adapt
         val frequency = callLogs[number]!!
 
         holder.numberTextView.text = number
-        holder.frequencyTextView.text = "Frequência: $frequency"
+        holder.frequencyTextView.text = "Calls: $frequency"
     }
 
     override fun getItemCount(): Int {

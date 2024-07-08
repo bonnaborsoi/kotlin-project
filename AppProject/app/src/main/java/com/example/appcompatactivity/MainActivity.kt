@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recyclerView)  // Referencia a RecyclerView do layout
         recyclerView.layoutManager = LinearLayoutManager(this)  // Configura o layout da RecyclerView como linear
 
-        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, periods)  // Cria um adaptador para o Spinner com os períodos
+        val spinnerAdapter = CustomSpinnerAdapter(this, android.R.layout.simple_spinner_item, periods)  // Cria um adaptador personalizado para o Spinner com os períodos
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)  // Configura o layout do dropdown do Spinner
         spinner.adapter = spinnerAdapter  // Define o adaptador no Spinner
 
@@ -127,7 +127,7 @@ class MainActivity : AppCompatActivity() {
 
             // Itera sobre cada registro de chamada no cursor
             while (cursor.moveToNext()) {
-                val number = cursor.getString(numberIndex)  // Número de telefone da chamada
+                val number = normalizePhoneNumber(cursor.getString(numberIndex))  // Normaliza o número de telefone da chamada
                 val date = cursor.getLong(dateIndex)  // Data da chamada em milissegundos
 
                 calendar.timeInMillis = date
@@ -192,13 +192,18 @@ class MainActivity : AppCompatActivity() {
 
             // Itera sobre cada entrada de contato no cursor
             while (cursor.moveToNext()) {
-                val number = cursor.getString(numberIndex)  // Número de telefone do contato
+                val number = normalizePhoneNumber(cursor.getString(numberIndex))  // Normaliza o número de telefone do contato
                 val name = cursor.getString(nameIndex)  // Nome do contato
 
                 contactNames[number] = name  // Associa o número ao nome do contato no mapa
             }
         }
         Log.d("MainActivity", "Contact names fetched: ${contactNames.size}")  // Log indica que os nomes de contatos foram obtidos
+    }
+
+    // Método para normalizar números de telefone
+    private fun normalizePhoneNumber(number: String): String {
+        return number.replace(Regex("[^\\d]"), "")  // Remove todos os caracteres não numéricos
     }
 
     // Método para atualizar a RecyclerView com base no período selecionado
@@ -222,23 +227,5 @@ class MainActivity : AppCompatActivity() {
         // Cria um novo adaptador com os registros de chamadas para exibir na RecyclerView
         numberAdapter = NumberAdapter(displayLogs)
         recyclerView.adapter = numberAdapter  // Define o adaptador na RecyclerView para exibir os dados
-    }
-}
-
-// Composable function para exibir um cumprimento (usado para teste com Jetpack Compose)
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-// Preview do Composable Greeting (usado para teste com Jetpack Compose)
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AppCompatActivityTheme {
-        Greeting("Android")
     }
 }

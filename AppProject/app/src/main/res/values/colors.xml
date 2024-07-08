@@ -9,7 +9,6 @@
     <color name="white">#FFFFFFFF</color>
     <color name="backgroundColor">#EEEDEB</color>
     <color name="RecyclerViewColor">#37B7C3</color>
-    <color name="RecyclerViewColor_test">#EEEDEB</color>
     <color name="textColor_one">#071952</color>
     <color name="textColor_two">#088395</color>
 
