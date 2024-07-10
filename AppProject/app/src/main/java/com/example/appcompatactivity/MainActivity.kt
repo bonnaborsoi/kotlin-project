@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     private val periods = listOf("total", "year", "month", "week", "day")
     private val callLogs = mutableMapOf<String, MutableMap<String, Int>>()
     private val contactNames = mutableMapOf<String, String>()
-    private var shouldUpdateRecyclerView = false // Variable to indicate if RecyclerView needs updating
+    private var periodAt = "total"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
                 updateRecyclerView(periods[position])
+                periodAt = periods[position]
             }
 
             override fun onNothingSelected(parent: AdapterView<*>) {}
@@ -72,7 +73,7 @@ class MainActivity : AppCompatActivity() {
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), PERMISSIONS_REQUEST_CODE)
         } else {
-            fetchCallLogs()
+            fetchCallLogs(periodAt)
         }
 
         val intentFilter = IntentFilter().apply {
@@ -83,10 +84,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (shouldUpdateRecyclerView) {
-            fetchCallLogs()
-            shouldUpdateRecyclerView = false
-        }
+        fetchCallLogs(periodAt)
     }
 
     override fun onDestroy() {
@@ -97,41 +95,7 @@ class MainActivity : AppCompatActivity() {
     private val callReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == TelephonyManager.ACTION_PHONE_STATE_CHANGED) {
-                val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
-                var phoneNumber: String? = null
-
-                when (state) {
-                    TelephonyManager.EXTRA_STATE_RINGING -> {
-                        phoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
-                    }
-                    TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            phoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_PHONE_ACCOUNT_HANDLE)
-                        } else {
-                            phoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
-                        }
-                    }
-                    TelephonyManager.EXTRA_STATE_IDLE -> {
-                        // Neste estado, não há número associado, então passamos null
-                    }
-                }
-
-                updateRecyclerViewWithCallDetails(phoneNumber)
-                shouldUpdateRecyclerView = true // Indicate that RecyclerView needs updating
-            }
-        }
-    }
-
-    private fun updateRecyclerViewWithCallDetails(phoneNumber: String?) {
-        phoneNumber?.let {
-            if (it.isNotBlank()) {
-                val normalizedNumber = normalizePhoneNumber(it)
-                if (normalizedNumber in callLogs) {
-                    callLogs[normalizedNumber]?.let { details ->
-                        details["total"] = details.getOrDefault("total", 0) + 1
-                        updateRecyclerView("total")
-                    }
-                }
+                fetchCallLogs(periodAt)
             }
         }
     }
@@ -140,14 +104,14 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSIONS_REQUEST_CODE) {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                fetchCallLogs()
+                fetchCallLogs(periodAt)
             } else {
                 Toast.makeText(this, "Permissões necessárias não concedidas", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    private fun fetchCallLogs() {
+    private fun fetchCallLogs(period: String) {
         Log.d("MainActivity", "Fetching contact names")
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
             fetchContactNames()
@@ -214,7 +178,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        updateRecyclerView("total")
+        updateRecyclerView(period)
     }
 
     private fun fetchContactNames() {
