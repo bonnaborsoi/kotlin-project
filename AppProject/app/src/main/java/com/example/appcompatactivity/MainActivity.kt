@@ -26,32 +26,45 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.util.Calendar
 
+// Define a main activity class that inherits from AppCompatActivity
 class MainActivity : AppCompatActivity() {
 
+    // Declare RecyclerView and NumberAdapter for displaying data
     private lateinit var recyclerView: RecyclerView
     private lateinit var numberAdapter: NumberAdapter
+    // Define a request code for permission requests
     private val PERMISSIONS_REQUEST_CODE = 123
+    // Declare a Spinner for selecting time periods
     private lateinit var spinner: Spinner
+    // Define a list of periods for filtering call logs
     private val periods = listOf("total", "year", "month", "week", "day")
+    // Map to store call logs with phone numbers as keys and another map for counts as values
     private val callLogs = mutableMapOf<String, MutableMap<String, Int>>()
+    // Map to store contact names associated with phone numbers
     private val contactNames = mutableMapOf<String, String>()
+    // Variable to keep track of the selected period
     private var periodAt = "total"
 
+    // Called when the activity is created
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Initialize the RecyclerView and set its layout manager and item decoration
         recyclerView = findViewById(R.id.recyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
 
+        // Initialize the Spinner and set its adapter
         spinner = findViewById(R.id.spinner)
         val spinnerAdapter = CustomSpinnerAdapter(this, android.R.layout.simple_spinner_item, periods)
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = spinnerAdapter
 
+        // Set a listener for item selection on the Spinner
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                // Update the RecyclerView based on the selected period
                 updateRecyclerView(periods[position])
                 periodAt = periods[position]
             }
@@ -59,6 +72,7 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
 
+        // Check and request necessary permissions
         val permissionsToRequest = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.READ_CALL_LOG)
@@ -70,28 +84,34 @@ class MainActivity : AppCompatActivity() {
             permissionsToRequest.add(Manifest.permission.READ_CONTACTS)
         }
 
+        // Request permissions if not already granted
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), PERMISSIONS_REQUEST_CODE)
         } else {
+            // If permissions are granted, fetch call logs
             fetchCallLogs(periodAt)
         }
 
+        // Register a BroadcastReceiver to listen for phone state changes
         val intentFilter = IntentFilter().apply {
             addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
         }
         registerReceiver(callReceiver, intentFilter)
     }
 
+    // Called when the activity resumes
     override fun onResume() {
         super.onResume()
         fetchCallLogs(periodAt)
     }
 
+    // Called when the activity is destroyed
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(callReceiver)
     }
 
+    // Define a BroadcastReceiver to handle phone state changes
     private val callReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == TelephonyManager.ACTION_PHONE_STATE_CHANGED) {
@@ -100,6 +120,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Handle the result of permission requests
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSIONS_REQUEST_CODE) {
@@ -111,6 +132,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Fetch call logs and update the RecyclerView
     private fun fetchCallLogs(period: String) {
         Log.d("MainActivity", "Fetching contact names")
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
@@ -120,6 +142,7 @@ class MainActivity : AppCompatActivity() {
         // Clear previous call logs to avoid duplicates
         callLogs.clear()
 
+        // Query the call log content provider
         val cursor: Cursor? = contentResolver.query(
             CallLog.Calls.CONTENT_URI,
             null,
@@ -128,6 +151,7 @@ class MainActivity : AppCompatActivity() {
             CallLog.Calls.DEFAULT_SORT_ORDER
         )
 
+        // Process the query results
         cursor?.use {
             val numberIndex = cursor.getColumnIndex(CallLog.Calls.NUMBER)
             val dateIndex = cursor.getColumnIndex(CallLog.Calls.DATE)
@@ -151,6 +175,7 @@ class MainActivity : AppCompatActivity() {
                 val currentWeek = calendar.get(Calendar.WEEK_OF_YEAR)
                 val currentDay = calendar.get(Calendar.DAY_OF_YEAR)
 
+                // Initialize the call log entry for the number if not already present
                 if (number !in callLogs) {
                     callLogs[number] = mutableMapOf(
                         "total" to 0,
@@ -161,6 +186,7 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
 
+                // Increment the appropriate counters based on the call date
                 callLogs[number]!!["total"] = callLogs[number]!!.getOrDefault("total", 0) + 1
 
                 if (callYear == currentYear) {
@@ -178,9 +204,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Update the RecyclerView with the filtered and sorted logs
         updateRecyclerView(period)
     }
 
+    // Fetch contact names and store them in the contactNames map
     private fun fetchContactNames() {
         val resolver: ContentResolver = contentResolver
         val cursor: Cursor? = resolver.query(
@@ -205,13 +233,16 @@ class MainActivity : AppCompatActivity() {
         Log.d("MainActivity", "Contact names fetched: ${contactNames.size}")
     }
 
+    // Normalize phone numbers by removing non-digit characters
     private fun normalizePhoneNumber(number: String): String {
         return number.replace(Regex("[^\\d]"), "")
     }
 
+    // Update the RecyclerView with the call logs for the specified period
     private fun updateRecyclerView(period: String) {
         Log.d("MainActivity", "Updating RecyclerView for period: $period")
 
+        // Filter and sort the call logs based on the selected period
         val filteredLogs = callLogs.mapValues { it.value[period] ?: 0 }.filter { it.value > 0 }
         val sortedLogs = filteredLogs.toList().sortedByDescending { it.second }.toMap()
         val displayLogs = sortedLogs.mapKeys { contactNames[it.key] ?: it.key }
@@ -220,6 +251,7 @@ class MainActivity : AppCompatActivity() {
         Log.d("MainActivity", "Sorted logs: $sortedLogs")
         Log.d("MainActivity", "Display logs: $displayLogs")
 
+        // Create a new adapter with the sorted logs and set it to the RecyclerView
         numberAdapter = NumberAdapter(displayLogs)
         recyclerView.adapter = numberAdapter
     }
