@@ -72,7 +72,7 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
 
-        // Check and request necessary permissions
+        // Check and request necessary permissions, store missing ones in permissionsToRequest
         val permissionsToRequest = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.READ_CALL_LOG)
@@ -84,7 +84,7 @@ class MainActivity : AppCompatActivity() {
             permissionsToRequest.add(Manifest.permission.READ_CONTACTS)
         }
 
-        // Request permissions if not already granted
+        // Request permissions (in permissionsToRequest) if not already granted
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), PERMISSIONS_REQUEST_CODE)
         } else {
