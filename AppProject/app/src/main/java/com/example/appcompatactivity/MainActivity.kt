@@ -94,9 +94,9 @@ class MainActivity : AppCompatActivity() {
 
         // Register a BroadcastReceiver to listen for phone state changes
         val intentFilter = IntentFilter().apply {
-            addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
+            addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED) // Specifies the kinds of intents the Receiver should listen
         }
-        registerReceiver(callReceiver, intentFilter)
+        registerReceiver(callReceiver, intentFilter) // Registers the broadcast to listen to the kinds of intent specified
     }
 
     // Called when the activity resumes
