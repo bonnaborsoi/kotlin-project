@@ -3,7 +3,6 @@ package com.example.appcompatactivity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.telephony.TelephonyManager
 import android.util.Log
 
@@ -14,7 +13,14 @@ class CallReceiver : BroadcastReceiver() {
 
         if (state == TelephonyManager.EXTRA_STATE_RINGING) {
             Log.d("CallReceiver", "Incoming call from: $incomingNumber")
-            // Aqui você pode salvar o número recebido para análise posterior
+            // Envie um broadcast informando que houve uma chamada recebida
+            val broadcastIntent = Intent("com.example.appcompatactivity.CALL_RECEIVED")
+            context?.sendBroadcast(broadcastIntent)
+        } else if (state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
+            Log.d("CallReceiver", "Outgoing call to: $incomingNumber")
+            // Envie um broadcast informando que houve uma chamada efetuada
+            val broadcastIntent = Intent("com.example.appcompatactivity.CALL_RECEIVED")
+            context?.sendBroadcast(broadcastIntent)
         }
     }
 }
